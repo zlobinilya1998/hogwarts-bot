@@ -2,6 +2,8 @@
 version: '3.1'
 
 services:
+  bot:
+    build: .
   db:
     image: postgres
     restart: always

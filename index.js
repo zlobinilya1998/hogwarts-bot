@@ -1,12 +1,10 @@
-const e = require('express');
 const express = require('express')
-const bodyParser = require('body-parser').json()
 const puppeteer = require('puppeteer');
 const app = express()
 const port = 3001
 const Discord = require('discord.js');
-const bot = new Discord.Client();
-const hook = new Discord.WebhookClient('1165062221777346731', 'XFjXcgk3qwTErMPinhdAUzhIaphi3nlNySb3XBjNL2sTlJHurf31eWs6flgpTd5gXZC3');
+
+const hook = new Discord.WebhookClient('1165421328770269395', 'ojLWReyA6mFXcAVYVw038WZuwFeAsxUND6uzJarPSJ2FLbRCWewml91W8pXeKtnynWs1');
 const Client = require('pg').Client
 const client = new Client({
     host: 'localhost',
@@ -16,13 +14,9 @@ const client = new Client({
     database: 'db',
 })
 
-app.use(bodyParser)
-
-
 iteration = 0
 
 async function getEncounters() {
-
     try {
         const browser = await puppeteer.launch();
         const page = await browser.newPage();
@@ -53,6 +47,7 @@ async function getEncounters() {
             if (!isInDb){
                 console.log("Add new enctounter to db")
                 await client.query(`INSERT INTO encounters(title,date,link) VALUES('${encounter.title}','${encounter.date}','${encounter.link}')`);
+                if (!iteration) return;
                 const lootText = await getLoot(encounter.link)
                 const recountText = await getRecount(encounter.link)
                 hook.send(`\n [Гильдия убила](<${encounter.link}>) ${encounter.title} \n ${lootText} \n ${recountText}`);
@@ -64,6 +59,7 @@ async function getEncounters() {
     } catch (e){
         console.log(e)
     } finally {
+        await new Promise(res => setTimeout(res, 60_000))
         getEncounters();
     }
     
@@ -116,7 +112,6 @@ const getRecount = async (link) => {
 const start = async () => {
 try {
     await client.connect()
-    await bot.login('MTE2NTA1NDM1ODg0MTQ2Mjc5Nw.GSi3jH.22hIHMkQ-JU307yY1vV4vdO6rGMN-y-GIzcxaw');
     getEncounters();
     app.listen(port, () => console.log('App listening....'))
 } catch (e) {
