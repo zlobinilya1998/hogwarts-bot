@@ -6,11 +6,20 @@ const bodyParser = require('body-parser')
 const Discord = require("discord.js");
 const { client} = require("./db")
 const { EncounterService } = require("./services/EncounterService");
+require('dotenv').config()
 const hook = new Discord.WebhookClient(
-    "1165421328770269395",
-    "ojLWReyA6mFXcAVYVw038WZuwFeAsxUND6uzJarPSJ2FLbRCWewml91W8pXeKtnynWs1"
+    process.env.BOT_CHANNEL_ID,
+    process.env.BOT_CHANNEL_TOKEN,
 );
 
+const Client = require("pg").Client;
+const client = new Client({
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE,
+});
 
 iteration = 0;
 
@@ -78,7 +87,7 @@ async function getEncounters() {
     } catch (e) {
         console.log(e);
     } finally {
-        await new Promise((res) => setTimeout(res, 60_000));
+        await new Promise((res) => setTimeout(res, 5_000));
         getEncounters();
     }
 }
