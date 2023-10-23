@@ -2,21 +2,29 @@ const express = require("express");
 const puppeteer = require("puppeteer");
 const app = express();
 const port = 3001;
+const bodyParser = require('body-parser')
 const Discord = require("discord.js");
-
+const { client} = require("./db")
+const { EncounterService } = require("./services/EncounterService");
 const hook = new Discord.WebhookClient(
     "1165421328770269395",
     "ojLWReyA6mFXcAVYVw038WZuwFeAsxUND6uzJarPSJ2FLbRCWewml91W8pXeKtnynWs1"
 );
-const Client = require("pg").Client;
-const client = new Client({
-    host: "db",
-    user: "postgres",
-    password: "postgres",
-    database: "db",
-});
+
 
 iteration = 0;
+
+app.use(bodyParser.json())
+
+app.get("/encounters",async (req,res) => {
+    const encounters = await EncounterService.getAll()
+    res.send(encounters)
+})
+
+app.post("/encounters", async (req,res) => {
+    const encounter = await EncounterService.create(req.body)
+    res.send(encounter)
+})
 
 async function getEncounters() {
     try {
@@ -56,7 +64,7 @@ async function getEncounters() {
                 await client.query(
                     `INSERT INTO encounters(title,date,link) VALUES('${encounter.title}','${encounter.date}','${encounter.link}')`
                 );
-                if (!iteration) return;
+                if (!iteration) continue;
                 const lootText = await getLoot(encounter.link);
                 const recountText = await getRecount(encounter.link);
                 hook.send(
@@ -132,3 +140,7 @@ const start = async () => {
 };
 
 start();
+
+module.exports = {
+    client
+}
