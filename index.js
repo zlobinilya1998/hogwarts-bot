@@ -1,3 +1,4 @@
+require('dotenv').config()
 const express = require("express");
 const puppeteer = require("puppeteer");
 const app = express();
@@ -6,20 +7,12 @@ const bodyParser = require('body-parser')
 const Discord = require("discord.js");
 const { client} = require("./db")
 const { EncounterService } = require("./services/EncounterService");
-require('dotenv').config()
 const hook = new Discord.WebhookClient(
     process.env.BOT_CHANNEL_ID,
     process.env.BOT_CHANNEL_TOKEN,
 );
 
-const Client = require("pg").Client;
-const client = new Client({
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_DATABASE,
-});
+
 
 iteration = 0;
 
@@ -39,7 +32,7 @@ async function getEncounters() {
     try {
         const browser = await puppeteer.launch({ headless: true });
         const page = await browser.newPage();
-        await page.goto("https://logs.stormforge.gg/guild/netherwing/hogwarts-legacy");
+        await page.goto("https://logs.stormforge.gg/recentlogs/netherwing");
         await page.setViewport({ width: 1800, height: 1200 });
         let encounters = await page.evaluate(() => {
             let encounters = Array.from(document.querySelectorAll(".list-group h6 a")).map(
@@ -62,24 +55,24 @@ async function getEncounters() {
             return dates;
         });
 
-        for await (const encounter of encounters) {
+        const reversedEncounters = encounters.reverse()
+
+        for await (const encounter of reversedEncounters) {
             const { rows } = await client.query(
                 `SELECT * FROM encounters WHERE date = '${encounter.date}' and title = '${encounter.title}'`
             );
             const isInDb = !!rows.length;
-
-            if (!isInDb) {
-                console.log("Add new enctounter to db");
-                await client.query(
-                    `INSERT INTO encounters(title,date,link) VALUES('${encounter.title}','${encounter.date}','${encounter.link}')`
-                );
-                if (!iteration) continue;
-                const lootText = await getLoot(encounter.link);
-                const recountText = await getRecount(encounter.link);
-                hook.send(
-                    `\n [Гильдия убила](<${encounter.link}>) ${encounter.title} \n ${lootText} \n ${recountText}`
-                );
-            }
+            if (isInDb) continue
+            console.log("Add new enctounter to db");
+            await client.query(
+                `INSERT INTO encounters(title,date,link) VALUES('${encounter.title}','${encounter.date}','${encounter.link}')`
+            );
+            if (!iteration) continue;
+            const lootText = await getLoot(encounter.link);
+            const recountText = await getRecount(encounter.link);
+            hook.send(
+                `\n [Гильдия убила](<${encounter.link}>) ${encounter.title} \n ${lootText} \n ${recountText}`
+            );
         }
         await browser.close();
         console.log("Итерация", iteration);
