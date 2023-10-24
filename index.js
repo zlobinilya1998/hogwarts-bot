@@ -1,4 +1,4 @@
-require('dotenv').config()
+require('dotenv').config({ path: `.env.development` });
 const express = require("express");
 const puppeteer = require("puppeteer");
 const app = express();
@@ -7,7 +7,6 @@ const bodyParser = require('body-parser')
 const Discord = require("discord.js");
 const {client} = require("./db")
 const {EncounterService} = require("./services/EncounterService");
-const {log} = require("nodemon/lib/utils");
 const hook = new Discord.WebhookClient(
     process.env.BOT_CHANNEL_ID,
     process.env.BOT_CHANNEL_TOKEN,
@@ -30,7 +29,14 @@ app.post("/encounters", async (req, res) => {
 
 async function getEncounters() {
     try {
-        const browser = await puppeteer.launch({headless: true});
+        const browser = await puppeteer.launch({
+            headless: true,
+            executablePath: '/usr/bin/chromium-browser',
+            args: [
+                '--no-sandbox',
+                '--disable-gpu',
+            ]
+        });
         const page = await browser.newPage();
 
         const allowedGuildNames = ["HOGWARTS LEGACY"]
@@ -86,7 +92,14 @@ async function getEncounters() {
 }
 
 const getLoot = async (link) => {
-    const browser = await puppeteer.launch({headless: true});
+    const browser = await puppeteer.launch({
+        headless: true,
+        executablePath: '/usr/bin/chromium-browser',
+        args: [
+            '--no-sandbox',
+            '--disable-gpu',
+        ]
+    });
     const page = await browser.newPage();
     await page.goto(link);
     await page.waitForSelector(".raid-loot");
@@ -102,7 +115,14 @@ const getLoot = async (link) => {
 };
 
 const getRecount = async (link) => {
-    const browser = await puppeteer.launch({headless: true});
+    const browser = await puppeteer.launch({
+        headless: true,
+        executablePath: '/usr/bin/chromium-browser',
+        args: [
+            '--no-sandbox',
+            '--disable-gpu',
+        ]
+    });
     const page = await browser.newPage();
     await page.goto(link);
     await page.waitForSelector(".simple-log");
@@ -127,13 +147,20 @@ const getRecount = async (link) => {
 };
 
 const getHeal = async (link) => {
-    const browser = await puppeteer.launch();
+    const browser = await puppeteer.launch({
+        headless: true,
+        executablePath: '/usr/bin/chromium-browser',
+        args: [
+            '--no-sandbox',
+            '--disable-gpu',
+        ]
+    });
     const page = await browser.newPage();
     await page.goto(link);
     await page.waitForSelector(".simple-log");
     await new Promise(res => setTimeout(res, 1_000))
     await page.click("input#healer-mode")
-    await new Promise(res => setTimeout(res, 1_000))
+    await new Promise(res => setTimeout(res, 2_000))
 
     let result = await page.evaluate(() => {
         let rows = Array.from(document.querySelectorAll(".simple-log .dmg-meter")).map((row) =>

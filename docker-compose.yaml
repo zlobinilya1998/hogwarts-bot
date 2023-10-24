@@ -5,6 +5,11 @@ services:
   bot:
     build: .
     restart: always
+    environment:
+        DB_HOST: db
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_DATABASE: db
     depends_on:
       - db
   db:
@@ -15,7 +20,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_DB: db
     ports:
-      - 6666:5432
+      - 5432:5432
     volumes:
       - ./postgres-data:/var/lib/postgresql
       - ./init.sql:/docker-entrypoint-initdb.d/db.sql
