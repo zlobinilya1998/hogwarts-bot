@@ -5,11 +5,8 @@ services:
   bot:
     build: .
     restart: always
-    environment:
-        DB_HOST: db
-        DB_USER: postgres
-        DB_PASSWORD: postgres
-        DB_DATABASE: db
+    env_file:
+      - .env.production
     depends_on:
       - db
   db:
