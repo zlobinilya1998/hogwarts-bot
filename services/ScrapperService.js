@@ -3,7 +3,7 @@ const {client} = require("../db");
 const {DiscordBotService} = require("./DiscordBotService");
 
 class ScrapperService {
-    static iteration = 0;
+    static iteration = 1;
     static puppeteerOptions = {
         headless: true,
         executablePath: '/usr/bin/chromium-browser',
@@ -53,9 +53,9 @@ class ScrapperService {
                 if (!allowedGuildNames.includes(encounter.guild)) continue
 
                 console.log('Отправка сообщения в дискорд для', encounter)
-                const lootText = await getLoot(encounter.link);
-                const recountText = await getRecount(encounter.link);
-                const healText = await getHeal(encounter.link)
+                const lootText = await this.getLoot(encounter.link);
+                const recountText = await this.getRecount(encounter.link);
+                const healText = await this.getHeal(encounter.link)
                 const message = `\n Гильдия **${encounter.guild}** убила [${encounter.title}](<${encounter.link}>) \n ${lootText} \n ${recountText} \n ${healText}`
                 await DiscordBotService.send(message);
             }

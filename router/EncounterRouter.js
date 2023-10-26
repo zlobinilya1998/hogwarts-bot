@@ -5,13 +5,21 @@ const EncounterRouter = express.Router();
 
 EncounterRouter.get("",)
 
-EncounterRouter.get("/", async (req, res) => {
-    const encounters = await EncounterService.getAll()
-    res.send(encounters)
+EncounterRouter.get("/", async (req, res, next) => {
+    try {
+        const encounters = await EncounterService.getAll()
+        res.send(encounters)
+    } catch (e) {
+        next(e)
+    }
 })
-EncounterRouter.post("/", async (req, res) => {
-    const encounter = await EncounterService.create(req.body)
-    res.send(encounter)
+EncounterRouter.post("/", async (req, res,next) => {
+    try {
+        const encounter = await EncounterService.create(req.body)
+        res.send(encounter)
+    } catch (e) {
+        next(e)
+    }
 })
 
 

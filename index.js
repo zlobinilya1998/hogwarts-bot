@@ -1,5 +1,4 @@
 // require('dotenv').config({ path: `.env.development` });
-
 const express = require("express");
 const bodyParser = require('body-parser')
 const app = express();
@@ -10,6 +9,13 @@ const {EncounterRouter} = require("./router/EncounterRouter")
 app.use(bodyParser.json())
 
 app.use('/encounters', EncounterRouter)
+
+app.use((err, req, res, next) => {
+    res.status(500).send({
+        isSuccess: false,
+        error: err.message || 'Something broke!'
+    })
+})
 
 
 
