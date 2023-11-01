@@ -3,7 +3,7 @@ const {client} = require("../db");
 const {DiscordBotService} = require("./DiscordBotService");
 
 class ScrapperService {
-    static iteration = 1;
+    static iteration = 0;
     static puppeteerOptions = {
         headless: true,
         executablePath: '/usr/bin/chromium-browser',
@@ -14,7 +14,7 @@ class ScrapperService {
     }
     // static puppeteerOptions = {}
 
-    static async getEncounters(){
+    static async getEncounters() {
         try {
             const browser = await puppeteer.launch(this.puppeteerOptions);
             const page = await browser.newPage();
@@ -42,12 +42,23 @@ class ScrapperService {
             })
 
             for await (const encounter of encounters) {
-                const {rows} = await client.query(`SELECT * FROM encounters WHERE date = '${encounter.date}' and title = '${encounter.title}' and guild = '${encounter.guild}'`);
-                const isInDb = !!rows.length;
-                if (isInDb) continue
+                const {rows} = await client.query(`SELECT * FROM encounter WHERE link = '${encounter.link}'`);
+                if (rows.length) continue
+
+
+                const {rows: guilds} = await client.query(`SELECT id FROM guild WHERE name = '${encounter.guild}'`);
+
+                let guildGuid = null;
+
+                if (guilds.length) {
+                    guildGuid = guilds[0].id
+                } else {
+                    const {rows: newGuild} = await client.query(`INSERT INTO guild(name) VALUES('${encounter.guild}') RETURNING id`)
+                    guildGuid = newGuild[0].id
+                }
                 console.log("Add new encounter to db", encounter);
                 await client.query(
-                    `INSERT INTO encounters(title,date,link,guild) VALUES('${encounter.title}','${encounter.date}','${encounter.link}', '${encounter.guild}')`
+                    `INSERT INTO encounter(title,date,link,guild_id) VALUES('${encounter.title}','${encounter.date}','${encounter.link}', '${guildGuid}')`
                 );
                 if (!this.iteration) continue;
                 if (!allowedGuildNames.includes(encounter.guild)) continue
@@ -65,12 +76,12 @@ class ScrapperService {
         } catch (e) {
             console.log(e);
         } finally {
-            await new Promise((res) => setTimeout(res, 5_000));
+            await new Promise((res) => setTimeout(res, 30_000));
             this.getEncounters();
         }
     }
 
-    static async getLoot(link){
+    static async getLoot(link) {
         const browser = await puppeteer.launch(this.puppeteerOptions);
         const page = await browser.newPage();
         await page.goto(link);
@@ -86,7 +97,7 @@ class ScrapperService {
         return `\n **Лут**: \n  ${loot.join("\n")}`;
     };
 
-    static async getRecount(link){
+    static async getRecount(link) {
         const browser = await puppeteer.launch(this.puppeteerOptions);
         const page = await browser.newPage();
         await page.goto(link);
@@ -111,14 +122,14 @@ class ScrapperService {
         return `\n**Дпс рейда** - **${totalRaidDps}**\n${result.join("\n")}`;
     };
 
-    static async getHeal(link){
+    static async getHeal(link) {
         const browser = await puppeteer.launch(this.puppeteerOptions);
         const page = await browser.newPage();
         await page.goto(link);
         await page.waitForSelector(".simple-log");
-        await new Promise(res => setTimeout(res, 1_000))
+        await new Promise(res => setTimeout(res, 4_000))
         await page.click("input#healer-mode")
-        await new Promise(res => setTimeout(res, 2_000))
+        await new Promise(res => setTimeout(res, 4_000))
 
         let result = await page.evaluate(() => {
             let rows = Array.from(document.querySelectorAll(".simple-log .dmg-meter")).map((row) =>
@@ -138,6 +149,37 @@ class ScrapperService {
         await browser.close();
         return `\n**Хпс рейда** - **${totalRaidHps}**\n${result.join("\n")}`;
     };
+
+    static async getCharacterInfo(name) {
+        const browser = await puppeteer.launch(this.puppeteerOptions);
+        const page = await browser.newPage();
+        await page.goto(`https://logs.stormforge.gg/character/netherwing/${name}`)
+        await page.waitForSelector(".character-stats");
+
+
+
+        const info = await page.evaluate(() => {
+            return Array.from(document.querySelectorAll(".character-stats.row")).map((item,index) => {
+                return item.innerText.replaceAll("\n", " ").replaceAll("\t", "");
+            });
+        })
+
+        const mappedInfo = info.map((text,index) => {
+            const getRowName = (index) => {
+                const map = new Map([
+                    [0,"Общие"],
+                    [1,"Характеристики"],
+                    [2,"Профессии"],
+                ])
+                return map.get(index)
+            }
+            return `${getRowName(index)}: ${text}`
+        })
+
+        console.log(mappedInfo)
+        await browser.close();
+        return `\nПерсонаж: **${name}** \n${mappedInfo.join("\n")}`
+    }
 }
 
 module.exports = {
