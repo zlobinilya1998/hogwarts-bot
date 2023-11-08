@@ -23,7 +23,7 @@ const start = async () => {
     try {
         await client.connect();
         ScrapperService.getEncounters();
-        app.listen(port, () => console.log("App listening...."));
+        app.listen(port, () => console.log(`App listening on port:${port}`));
     } catch (e) {
         console.log(e);
     }
