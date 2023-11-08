@@ -2,17 +2,31 @@ const puppeteer = require("puppeteer");
 const {DiscordBotService} = require("./DiscordBotService");
 const {EncounterFacade} = require("../facade/EncounterFacade");
 
+const getPuppeeterOptions = () => {
+    const isDev = process.env.DB_PORT;
+    const options = {
+        dev: {},
+        prod: {
+            headless: true,
+            executablePath: '/usr/bin/chromium-browser',
+            args: [
+                '--no-sandbox',
+                '--disable-gpu',
+            ]
+        }
+    }
+    return isDev ? options.dev : options.prod;
+}
+
+getPuppeeterOptions()
+
 class ScrapperService {
     static iteration = 0;
-    // static puppeteerOptions = {
-    //     headless: true,
-    //     executablePath: '/usr/bin/chromium-browser',
-    //     args: [
-    //         '--no-sandbox',
-    //         '--disable-gpu',
-    //     ]
-    // }
-    static puppeteerOptions = {}
+    static puppeteerOptions = getPuppeeterOptions();
+    static pages = {
+        recentLogs: "https://logs.stormforge.gg/recentlogs/netherwing",
+        character: name => `https://logs.stormforge.gg/character/netherwing/${name}`,
+    }
 
     static async getEncounters() {
         try {
@@ -21,7 +35,7 @@ class ScrapperService {
 
             const allowedGuildNames = ["HOGWARTS LEGACY"]
 
-            await page.goto("https://logs.stormforge.gg/recentlogs/netherwing");
+            await page.goto(this.pages.recentLogs);
             await page.setViewport({width: 1800, height: 1200});
             await page.waitForSelector(".list-group a");
 
@@ -48,7 +62,7 @@ class ScrapperService {
                 await DiscordBotService.send(message);
             }
             await browser.close();
-            console.log("Итерация", this.iteration);
+            console.log(`Iteration: ${this.iteration} complete, next iteration after 30 sec`);
             this.iteration += 1;
         } catch (e) {
             console.log(e);
@@ -137,10 +151,8 @@ class ScrapperService {
     static async getCharacterInfo(name) {
         const browser = await puppeteer.launch(this.puppeteerOptions);
         const page = await browser.newPage();
-        await page.goto(`https://logs.stormforge.gg/character/netherwing/${name}`)
+        await page.goto(this.pages.character(name))
         await page.waitForSelector(".character-stats");
-
-
 
         const info = await page.evaluate(() => {
             return Array.from(document.querySelectorAll(".character-stats.row")).map((item,index) => {

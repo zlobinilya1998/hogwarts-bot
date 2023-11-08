@@ -3,7 +3,7 @@ const {ScrapperService} = require("./services/ScrapperService");
 const client = new Discord.Client();
 
 client.on('ready', () => {
-    console.log(`Logged in as ${client.user.tag}!`);
+    console.log(`Bot: logged in Discord as ${client.user.tag}!`);
 });
 
 client.on('message', async msg => {
