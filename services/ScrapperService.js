@@ -1,18 +1,18 @@
 const puppeteer = require("puppeteer");
-const {client} = require("../db");
 const {DiscordBotService} = require("./DiscordBotService");
+const {EncounterFacade} = require("../facade/EncounterFacade");
 
 class ScrapperService {
     static iteration = 0;
-    static puppeteerOptions = {
-        headless: true,
-        executablePath: '/usr/bin/chromium-browser',
-        args: [
-            '--no-sandbox',
-            '--disable-gpu',
-        ]
-    }
-    // static puppeteerOptions = {}
+    // static puppeteerOptions = {
+    //     headless: true,
+    //     executablePath: '/usr/bin/chromium-browser',
+    //     args: [
+    //         '--no-sandbox',
+    //         '--disable-gpu',
+    //     ]
+    // }
+    static puppeteerOptions = {}
 
     static async getEncounters() {
         try {
@@ -42,32 +42,9 @@ class ScrapperService {
             })
 
             for await (const encounter of encounters) {
-                const {rows} = await client.query(`SELECT * FROM encounter WHERE link = '${encounter.link}'`);
-                if (rows.length) continue
-
-
-                const {rows: guilds} = await client.query(`SELECT id FROM guild WHERE name = '${encounter.guild}'`);
-
-                let guildGuid = null;
-
-                if (guilds.length) {
-                    guildGuid = guilds[0].id
-                } else {
-                    const {rows: newGuild} = await client.query(`INSERT INTO guild(name) VALUES('${encounter.guild}') RETURNING id`)
-                    guildGuid = newGuild[0].id
-                }
-                console.log("Add new encounter to db", encounter);
-                await client.query(
-                    `INSERT INTO encounter(title,date,link,guild_id) VALUES('${encounter.title}','${encounter.date}','${encounter.link}', '${guildGuid}')`
-                );
-                if (!this.iteration) continue;
-                if (!allowedGuildNames.includes(encounter.guild)) continue
-
-                console.log('Отправка сообщения в дискорд для', encounter)
-                const lootText = await this.getLoot(encounter.link);
-                const recountText = await this.getRecount(encounter.link);
-                const healText = await this.getHeal(encounter.link)
-                const message = `\n Гильдия **${encounter.guild}** убила [${encounter.title}](<${encounter.link}>) \n ${lootText} \n ${recountText} \n ${healText}`
+                await EncounterFacade.create(encounter);
+                if (!allowedGuildNames.includes(encounter.guild) || !this.iteration) continue
+                const message = await this.getEncounterMessage(encounter);
                 await DiscordBotService.send(message);
             }
             await browser.close();
@@ -79,6 +56,13 @@ class ScrapperService {
             await new Promise((res) => setTimeout(res, 30_000));
             this.getEncounters();
         }
+    }
+
+    static async getEncounterMessage(encounter) {
+        const lootText = await this.getLoot(encounter.link);
+        const recountText = await this.getRecount(encounter.link);
+        const healText = await this.getHeal(encounter.link)
+        return `\n Гильдия **${encounter.guild}** убила [${encounter.title}](<${encounter.link}>) \n ${lootText} \n ${recountText} \n ${healText}`;
     }
 
     static async getLoot(link) {
@@ -127,9 +111,9 @@ class ScrapperService {
         const page = await browser.newPage();
         await page.goto(link);
         await page.waitForSelector(".simple-log");
-        await new Promise(res => setTimeout(res, 4_000))
+        await new Promise(res => setTimeout(res, 10_000))
         await page.click("input#healer-mode")
-        await new Promise(res => setTimeout(res, 4_000))
+        await new Promise(res => setTimeout(res, 20_000))
 
         let result = await page.evaluate(() => {
             let rows = Array.from(document.querySelectorAll(".simple-log .dmg-meter")).map((row) =>
