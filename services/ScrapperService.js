@@ -2,6 +2,7 @@ const puppeteer = require("puppeteer");
 const { DiscordBotService } = require("./DiscordBotService");
 const { EncounterFacade } = require("../facade/EncounterFacade");
 const { EncounterRepository } = require("../repository/EncounterRepository");
+const {NotificationService} = require("./NotificationService");
 
 const getPuppeteerOptions = () => {
     const isDev = process.env.DB_PORT;
@@ -31,7 +32,7 @@ class ScrapperService {
             min: 100,
         }
     }
-    static allowedGuildNames = ["HOGWARTS LEGACY"]
+    static allowedGuildNames = ["HOGWARTS LEGACY","Random group"]
 
     static async getEncounters() {
         try {
@@ -67,6 +68,7 @@ class ScrapperService {
                 const message = await this.getEncounterMessage(encounter);
                 await DiscordBotService.send(message);
                 await EncounterFacade.create(encounter);
+                await NotificationService.sendEncounterNotification();
             }
             await browser.close();
             console.log(`Iteration: ${this.iteration} complete, next iteration after 30 sec`);

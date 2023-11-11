@@ -17,3 +17,8 @@ CREATE TABLE player (
     guild_id INTEGER,
     FOREIGN KEY (guild_id) REFERENCES guild (id)
 );
+
+CREATE TABLE encounter_notification (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER
+)
