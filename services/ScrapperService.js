@@ -2,9 +2,8 @@ const puppeteer = require("puppeteer");
 const { DiscordBotService } = require("./DiscordBotService");
 const { EncounterFacade } = require("../facade/EncounterFacade");
 const { EncounterRepository } = require("../repository/EncounterRepository");
-const { log } = require("nodemon/lib/utils");
 
-const getPuppeeterOptions = () => {
+const getPuppeteerOptions = () => {
     const isDev = process.env.DB_PORT;
     const options = {
         dev: {},
@@ -17,22 +16,27 @@ const getPuppeeterOptions = () => {
     return isDev ? options.dev : options.prod;
 };
 
-getPuppeeterOptions();
-
 class ScrapperService {
     static iteration = 0;
-    static puppeteerOptions = getPuppeeterOptions();
+    static puppeteerOptions = getPuppeteerOptions();
     static pages = {
         recentLogs: "https://logs.stormforge.gg/recentlogs/netherwing",
         character: (name) => `https://logs.stormforge.gg/character/netherwing/${name}`,
     };
+    static options = {
+        dps: {
+            min: 100,
+        },
+        hps: {
+            min: 100,
+        }
+    }
+    static allowedGuildNames = ["HOGWARTS LEGACY"]
 
     static async getEncounters() {
         try {
             const browser = await puppeteer.launch(this.puppeteerOptions);
             const page = await browser.newPage();
-
-            const allowedGuildNames = ["HOGWARTS LEGACY"];
 
             await page.goto(this.pages.recentLogs);
             await page.setViewport({ width: 1800, height: 1200 });
@@ -57,25 +61,28 @@ class ScrapperService {
             });
 
             for await (const encounter of encounters) {
-                if (!allowedGuildNames.includes(encounter.guild)) continue;
+                if (!this.allowedGuildNames.includes(encounter.guild)) continue;
                 const isEncounterInDb = await EncounterRepository.getByLink(encounter.link);
                 if (isEncounterInDb) continue;
-                await EncounterFacade.create(encounter);
                 const message = await this.getEncounterMessage(encounter);
                 await DiscordBotService.send(message);
+                await EncounterFacade.create(encounter);
             }
             await browser.close();
             console.log(`Iteration: ${this.iteration} complete, next iteration after 30 sec`);
             this.iteration += 1;
+            await new Promise((res) => setTimeout(res, 30_000));
+            await this.getEncounters();
         } catch (e) {
             console.log(e);
-        } finally {
-            await new Promise((res) => setTimeout(res, 30_000));
-            this.getEncounters();
+            await this.getEncounters();
         }
+
     }
 
     static async getEncounterMessage(encounter) {
+        console.log(`Try to get info for encounter ${encounter.link}`)
+
         const lootText = await this.getLoot(encounter.link);
         const recountText = await this.getRecount(encounter.link);
         const healText = await this.getHeal(encounter.link);
@@ -83,21 +90,25 @@ class ScrapperService {
     }
 
     static async getLoot(link) {
-        const browser = await puppeteer.launch(this.puppeteerOptions);
-        const page = await browser.newPage();
-        await page.goto(link);
-        await page.waitForSelector(".raid-loot");
-        let loot = await page.evaluate(() => {
-            return Array.from(document.querySelectorAll(".raid-loot .choices__item")).map(
-                (item) => ({
-                    title: item.innerText,
-                    link: item.href,
-                })
-            );
-        });
-        loot = loot.map((item) => `- [${item.title}](<${item.link}>)`);
-        await browser.close();
-        return `\n**Лут**: \n${loot.join("\n")}`;
+        try {
+            const browser = await puppeteer.launch(this.puppeteerOptions);
+            const page = await browser.newPage();
+            await page.goto(link);
+            await page.waitForSelector(".raid-loot");
+            let loot = await page.evaluate(() => {
+                return Array.from(document.querySelectorAll(".raid-loot .choices__item")).map(
+                    (item) => ({
+                        title: item.innerText,
+                        link: item.href,
+                    })
+                );
+            });
+            loot = loot.map((item) => `- [${item.title}](<${item.link}>)`);
+            await browser.close();
+            return `\n**Лут**: \n${loot.join("\n")}`;
+        } catch (e) {
+            return `\n**Лут**: Не удалось загрузить`;
+        }
     }
 
     static async getRecount(link) {
@@ -130,7 +141,7 @@ class ScrapperService {
 
         const totalRaidDps = result.reduce((acc, curValue) => acc + curValue.dps, 0);
         result = result
-            .filter((item) => item.dps > 500)
+            .filter((item) => item.dps > this.options.dps.min)
             .map((item) => `${item.position}. ${item.name} *${item.total}* **(${item.dps})**`);
 
         await browser.close();
@@ -141,10 +152,11 @@ class ScrapperService {
         const browser = await puppeteer.launch(this.puppeteerOptions);
         const page = await browser.newPage();
         await page.goto(link);
-        await page.waitForSelector(".simple-log");
+        await page.waitForSelector(".simple-log")
         await new Promise((res) => setTimeout(res, 10_000));
         await page.click("input#healer-mode");
-        await new Promise((res) => setTimeout(res, 20_000));
+        await new Promise((res) => setTimeout(res, 10_000));
+        await page.waitForFunction(`document.querySelector(".simple-log div").innerText === "HPS"`)
 
         let result = await page.evaluate(() => {
             let rows = Array.from(document.querySelectorAll(".simple-log .dmg-meter")).map((row) =>
@@ -169,9 +181,11 @@ class ScrapperService {
         });
         const totalRaidHps = result.reduce((acc, curValue) => acc + curValue.hps, 0);
         result = result
-            .filter((item) => item.hps > 300)
+            .filter((item) => item.hps > this.options.hps.min)
             .map((item) => `${item.position}. ${item.name} *${item.total}* **(${item.hps})**`);
         await browser.close();
+
+        if (!result.length) return ""
         return `\n**Хпс рейда** - **${totalRaidHps}**\n${result.join("\n")}`;
     }
 
