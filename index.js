@@ -1,4 +1,4 @@
-// require('dotenv').config({ path: `.env.development` });
+require('dotenv').config({ path: `.env.development` });
 const express = require("express");
 const bodyParser = require('body-parser')
 const bot = require('./bot')
@@ -8,6 +8,12 @@ const {client} = require("./db")
 const {ScrapperService} = require("./services/ScrapperService");
 const {EncounterRouter} = require("./router/EncounterRouter")
 const {CharacterRouter} = require("./router/CharacterRouter");
+
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    next();
+});
+
 app.use(bodyParser.json())
 
 app.use('/encounters', EncounterRouter)
