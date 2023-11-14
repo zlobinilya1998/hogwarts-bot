@@ -66,8 +66,9 @@ class ScrapperService {
                 const isEncounterInDb = await EncounterRepository.getByLink(encounter.link);
                 if (isEncounterInDb) continue;
                 const message = await this.getEncounterMessage(encounter);
+                const items = await this.getLoot(encounter);
                 await DiscordBotService.send(message);
-                await EncounterFacade.create(encounter);
+                await EncounterFacade.create(encounter,items);
                 await NotificationService.sendEncounterNotification();
             }
             await browser.close();
@@ -84,18 +85,20 @@ class ScrapperService {
 
     static async getEncounterMessage(encounter) {
         console.log(`Try to get info for encounter ${encounter.link}`)
-
-        const lootText = await this.getLoot(encounter.link);
-        const recountText = await this.getRecount(encounter.link);
-        const healText = await this.getHeal(encounter.link);
+        const loot = await this.getLoot(encounter)
+        const lootText = await this.getLoot(loot);
+        const recount = await this.getRecount(encounter.link);
+        const recountText = await this.getRecountText(recount);
+        const heal = await this.getHeal(encounter.link);
+        const healText = await this.getHealText(heal);
         return `Гильдия **${encounter.guild}** убила [${encounter.title}](<${encounter.link}>) \n ${lootText} \n ${recountText} \n ${healText}`;
     }
 
-    static async getLoot(link) {
+    static async getLoot(encounter) {
         try {
             const browser = await puppeteer.launch(this.puppeteerOptions);
             const page = await browser.newPage();
-            await page.goto(link);
+            await page.goto(encounter.link);
             await page.waitForSelector(".raid-loot");
             let loot = await page.evaluate(() => {
                 return Array.from(document.querySelectorAll(".raid-loot .choices__item")).map(
@@ -105,12 +108,16 @@ class ScrapperService {
                     })
                 );
             });
-            loot = loot.map((item) => `- [${item.title}](<${item.link}>)`);
             await browser.close();
-            return `\n**Лут**: \n${loot.join("\n")}`;
+            return loot;
         } catch (e) {
-            return `\n**Лут**: Не удалось загрузить`;
+            return [];
         }
+    }
+
+    static async getLootText(loot) {
+        loot = loot.map((item) => `- [${item.title}](<${item.link}>)`);
+        return `\n**Лут**: \n${loot.join("\n")}`;
     }
 
     static async getRecount(link) {
@@ -118,8 +125,7 @@ class ScrapperService {
         const page = await browser.newPage();
         await page.goto(link);
         await page.waitForSelector(".simple-log");
-
-        let result = await page.evaluate(() => {
+        const result = await page.evaluate(() => {
             let rows = Array.from(document.querySelectorAll(".simple-log .dmg-meter")).map((row) =>
                 row.innerText.replaceAll("\n", " ").split(" ")
             );
@@ -140,16 +146,16 @@ class ScrapperService {
                 };
             });
         });
-
-        const totalRaidDps = result.reduce((acc, curValue) => acc + curValue.dps, 0);
-        result = result
+        await browser.close();
+        return result;
+    }
+    static async getRecountText(recount){
+        const totalRaidDps = recount.reduce((acc, curValue) => acc + curValue.dps, 0);
+        const result = recount
             .filter((item) => item.dps > this.options.dps.min)
             .map((item) => `${item.position}. ${item.name} *${item.total}* **(${item.dps})**`);
-
-        await browser.close();
         return `\n**Дпс рейда** - **${totalRaidDps}**\n${result.join("\n")}`;
     }
-
     static async getHeal(link) {
         const browser = await puppeteer.launch(this.puppeteerOptions);
         const page = await browser.newPage();
@@ -160,7 +166,7 @@ class ScrapperService {
         await new Promise((res) => setTimeout(res, 10_000));
         await page.waitForFunction(`document.querySelector(".simple-log div").innerText === "HPS"`)
 
-        let result = await page.evaluate(() => {
+        const result = await page.evaluate(() => {
             let rows = Array.from(document.querySelectorAll(".simple-log .dmg-meter")).map((row) =>
                 row.innerText.replaceAll("\n", " ").split(" ")
             );
@@ -181,12 +187,14 @@ class ScrapperService {
                 };
             });
         });
-        const totalRaidHps = result.reduce((acc, curValue) => acc + curValue.hps, 0);
-        result = result
+        await browser.close();
+        return result;
+    }
+    static async getHealText(heal){
+        const totalRaidHps = heal.reduce((acc, curValue) => acc + curValue.hps, 0);
+        const result = heal
             .filter((item) => item.hps > this.options.hps.min)
             .map((item) => `${item.position}. ${item.name} *${item.total}* **(${item.hps})**`);
-        await browser.close();
-
         if (!result.length) return ""
         return `\n**Хпс рейда** - **${totalRaidHps}**\n${result.join("\n")}`;
     }
