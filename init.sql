@@ -8,6 +8,7 @@ CREATE TABLE encounter (
   title VARCHAR(255),
   date VARCHAR(255),
   link VARCHAR(255),
+  image VARCHAR(255),
   guild_id INTEGER,
   FOREIGN KEY (guild_id) REFERENCES guild (id)
 );
@@ -28,6 +29,7 @@ CREATE TABLE item (
     id SERIAL,
     title VARCHAR(255),
     link VARCHAR(255),
+    image VARCHAR(255),
     encounter_id INTEGER,
     FOREIGN KEY (encounter_id) REFERENCES encounter (id)
 );

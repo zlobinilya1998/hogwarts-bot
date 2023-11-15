@@ -32,7 +32,7 @@ class ScrapperService {
             min: 100,
         }
     }
-    static allowedGuildNames = ["HOGWARTS LEGACY","Random group"]
+    static allowedGuildNames = ["HOGWARTS LEGACY"]
 
     static async getEncounters() {
         try {
@@ -50,11 +50,13 @@ class ScrapperService {
                         const title = item.querySelector("h6").innerText;
                         const guild = item.querySelector("h5").innerText;
                         const date = item.querySelector("span").innerText;
+                        const image = item.querySelector("img").src;
                         return {
                             link,
                             title: title.replaceAll("'", "''"),
                             guild,
                             date: new Date(date).toLocaleDateString(),
+                            image,
                         };
                     }
                 );
@@ -86,7 +88,7 @@ class ScrapperService {
     static async getEncounterMessage(encounter) {
         console.log(`Try to get info for encounter ${encounter.link}`)
         const loot = await this.getLoot(encounter)
-        const lootText = await this.getLoot(loot);
+        const lootText = await this.getLootText(loot);
         const recount = await this.getRecount(encounter.link);
         const recountText = await this.getRecountText(recount);
         const heal = await this.getHeal(encounter.link);
@@ -100,24 +102,29 @@ class ScrapperService {
             const page = await browser.newPage();
             await page.goto(encounter.link);
             await page.waitForSelector(".raid-loot");
-            let loot = await page.evaluate(() => {
-                return Array.from(document.querySelectorAll(".raid-loot .choices__item")).map(
-                    (item) => ({
-                        title: item.innerText,
-                        link: item.href,
-                    })
-                );
+            const loot = await page.evaluate(() => {
+                return Array.from(document.querySelectorAll(".raid-loot .text-center")).map(item => {
+                    const img = item.querySelector("img").src;
+                    const title = item.querySelector("a").innerText;
+                    const link = item.querySelector("a").href;
+                    return {
+                        img,
+                        title,
+                        link
+                    }
+                });
             });
             await browser.close();
             return loot;
         } catch (e) {
+            console.log('Error,while getting lot', e)
             return [];
         }
     }
 
     static async getLootText(loot) {
-        loot = loot.map((item) => `- [${item.title}](<${item.link}>)`);
-        return `\n**Лут**: \n${loot.join("\n")}`;
+        const text = loot.map((item) => `- [${item.title}](<${item.link}>)`);
+        return `\n**Лут**: \n${text.join("\n")}`;
     }
 
     static async getRecount(link) {

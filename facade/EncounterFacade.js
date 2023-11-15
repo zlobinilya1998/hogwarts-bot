@@ -8,7 +8,7 @@ class EncounterFacade {
         let guildGuid = null;
         if (guild) guildGuid = guild.id
         else guildGuid = await GuildRepository.insertOne(encounter.guild);
-        const { id } = await EncounterRepository.insertOne(encounter.title,encounter.date,encounter.link, guildGuid);
+        const { id } = await EncounterRepository.insertOne(encounter.image,encounter.title,encounter.date,encounter.link, guildGuid);
         await ItemRepository.insertMany(items, id);
     }
 }

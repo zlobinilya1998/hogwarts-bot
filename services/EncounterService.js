@@ -1,8 +1,16 @@
 const {EncounterRepository} = require("../repository/EncounterRepository");
+const {ItemService} = require("./ItemService");
 
 class EncounterService {
     static async getAll() {
-        return await EncounterRepository.getAll();
+        let encounters = await EncounterRepository.getAll();
+
+        const result = []
+        for await (const item of encounters){
+            const encounterItems = await ItemService.getAllByEncounterId(item.id)
+            result.push({...item, items: encounterItems})
+        }
+        return result
     }
 
     static async create(encounter) {

@@ -1,4 +1,4 @@
-require('dotenv').config({ path: `.env.development` });
+// require('dotenv').config({ path: `.env.development` });
 const express = require("express");
 const bodyParser = require('body-parser')
 const bot = require('./bot')
