@@ -124,6 +124,9 @@ class ScrapperService {
 
     static async getLootText(loot) {
         const text = loot.map((item) => `- [${item.title}](<${item.link}>)`);
+
+        if (!text.length) return `\n**Лут**: не удалось загрузить`
+
         return `\n**Лут**: \n${text.join("\n")}`;
     }
 
